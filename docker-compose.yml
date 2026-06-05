@@ -1,0 +1,33 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: blemberg
+      POSTGRES_USER: blemberg
+      POSTGRES_PASSWORD: blemberg
+    ports:
+      - "${BLEMBERG_POSTGRES_PORT:-55432}:5432"
+    volumes:
+      - blemberg-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U blemberg -d blemberg"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/blemberg
+      SPRING_DATASOURCE_USERNAME: blemberg
+      SPRING_DATASOURCE_PASSWORD: blemberg
+      TWELVE_DATA_API_KEY: ${TWELVE_DATA_API_KEY:-}
+      FRED_API_KEY: ${FRED_API_KEY:-}
+    ports:
+      - "${BLEMBERG_APP_PORT:-8081}:8080"
+
+volumes:
+  blemberg-postgres:

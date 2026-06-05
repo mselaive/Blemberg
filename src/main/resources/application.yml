@@ -1,0 +1,45 @@
+spring:
+  application:
+    name: blemberg
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:55432/blemberg}
+    username: ${SPRING_DATASOURCE_USERNAME:blemberg}
+    password: ${SPRING_DATASOURCE_PASSWORD:blemberg}
+  flyway:
+    enabled: true
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+blemberg:
+  market-data:
+    historical-volatility-window-days: 60
+    snapshot-stale-after: 24h
+    bars-stale-after: 7d
+    rates-stale-after: 7d
+    dividends-stale-after: 30d
+  providers:
+    twelve-data:
+      base-url: ${TWELVE_DATA_BASE_URL:https://api.twelvedata.com}
+      api-key: ${TWELVE_DATA_API_KEY:}
+      credits-per-minute: ${TWELVE_DATA_CREDITS_PER_MINUTE:8}
+      credits-per-day: ${TWELVE_DATA_CREDITS_PER_DAY:800}
+      request-timeout: 10s
+    fred:
+      base-url: ${FRED_BASE_URL:https://api.stlouisfed.org}
+      api-key: ${FRED_API_KEY:}
+      request-timeout: 10s
+
+server:
+  port: ${SERVER_PORT:8080}
