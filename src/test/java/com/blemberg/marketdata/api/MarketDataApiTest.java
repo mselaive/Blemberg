@@ -4,6 +4,7 @@ import com.blemberg.instruments.domain.Provider;
 import com.blemberg.marketdata.domain.MarketDailyBar;
 import com.blemberg.marketdata.domain.MarketPriceSnapshot;
 import com.blemberg.marketdata.domain.RiskFreeRate;
+import com.blemberg.marketdata.infrastructure.DividendYieldRepository;
 import com.blemberg.marketdata.infrastructure.MarketDailyBarRepository;
 import com.blemberg.marketdata.infrastructure.MarketPriceSnapshotRepository;
 import com.blemberg.marketdata.infrastructure.RiskFreeRateRepository;
@@ -42,8 +43,15 @@ class MarketDataApiTest {
     @Autowired
     private RiskFreeRateRepository riskFreeRateRepository;
 
+    @Autowired
+    private DividendYieldRepository dividendYieldRepository;
+
     @BeforeEach
     void seedMarketData() {
+        barRepository.deleteAll();
+        snapshotRepository.deleteAll();
+        riskFreeRateRepository.deleteAll();
+
         snapshotRepository.save(new MarketPriceSnapshot(
             "AAPL",
             BigDecimal.valueOf(190.00),
@@ -98,10 +106,60 @@ class MarketDataApiTest {
     void returnsCachedSnapshot() throws Exception {
         mockMvc.perform(get("/api/market-data/snapshots").param("symbols", "aapl"))
             .andExpect(status().isOk())
+            .andExpect(jsonPath("$.snapshots[0].symbol").value("AAPL"))
+            .andExpect(jsonPath("$.snapshots[0].lastPrice").value(190.00))
+            .andExpect(jsonPath("$.snapshots[0].source").value("TWELVE_DATA"))
+            .andExpect(jsonPath("$.snapshots[0].stale").value(false))
+            .andExpect(jsonPath("$.missingSymbols").isEmpty());
+    }
+
+    @Test
+    void returnsAvailableSnapshotsAndMissingSymbols() throws Exception {
+        mockMvc.perform(get("/api/market-data/snapshots").param("symbols", "AAPL,SPY,QQQ,MSFT"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.snapshots[0].symbol").value("AAPL"))
+            .andExpect(jsonPath("$.missingSymbols[0]").value("SPY"))
+            .andExpect(jsonPath("$.missingSymbols[1]").value("QQQ"))
+            .andExpect(jsonPath("$.missingSymbols[2]").value("MSFT"));
+    }
+
+    @Test
+    void snapshotsReturn404WhenNoneExist() throws Exception {
+        mockMvc.perform(get("/api/market-data/snapshots").param("symbols", "SPY,QQQ"))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.message").value("Snapshot not found"));
+    }
+
+    @Test
+    void returnsDailyBars() throws Exception {
+        mockMvc.perform(get("/api/market-data/daily-bars")
+                .param("symbol", "AAPL")
+                .param("limit", "5"))
+            .andExpect(status().isOk())
             .andExpect(jsonPath("$[0].symbol").value("AAPL"))
-            .andExpect(jsonPath("$[0].lastPrice").value(190.00))
-            .andExpect(jsonPath("$[0].source").value("TWELVE_DATA"))
-            .andExpect(jsonPath("$[0].stale").value(false));
+            .andExpect(jsonPath("$[0].close").isNumber())
+            .andExpect(jsonPath("$[0].source").value("TWELVE_DATA"));
+    }
+
+    @Test
+    void returnsRiskFreeRates() throws Exception {
+        mockMvc.perform(get("/api/market-data/risk-free-rates"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].tenorCode").value("1Y"))
+            .andExpect(jsonPath("$[0].rateDecimal").value(0.04));
+    }
+
+    @Test
+    void openApiDocsAreIntentionallyUnavailable() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+            .andExpect(status().isNotImplemented())
+            .andExpect(jsonPath("$.message").value("OpenAPI is not enabled in Blemberg V1."));
+    }
+
+    @Test
+    void actuatorMappingsAreExposed() throws Exception {
+        mockMvc.perform(get("/actuator/mappings"))
+            .andExpect(status().isOk());
     }
 
     @Test
@@ -118,5 +176,17 @@ class MarketDataApiTest {
             .andExpect(jsonPath("$.dividendYield").value(0.0))
             .andExpect(jsonPath("$.currency").value("USD"))
             .andExpect(jsonPath("$.source").value("BLEMBERG"));
+    }
+
+    @Test
+    void pricingInputsCreateMissingDividendFallback() throws Exception {
+        dividendYieldRepository.deleteAll();
+
+        mockMvc.perform(get("/api/market-data/pricing-inputs/european-option")
+                .param("symbol", "AAPL")
+                .param("maturityDate", LocalDate.now().plusMonths(18).toString()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.dividendYield").value(0.0))
+            .andExpect(jsonPath("$.dividendYieldMethod").value("UNKNOWN_ZERO"));
     }
 }

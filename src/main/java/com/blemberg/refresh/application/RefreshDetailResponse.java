@@ -7,42 +7,31 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-public record RefreshResponse(
+public record RefreshDetailResponse(
     UUID runId,
     String status,
+    String jobName,
     Instant startedAt,
     Instant finishedAt,
     int symbolsRequested,
     int symbolsSucceeded,
     int symbolsFailed,
     List<RefreshJobSummary> jobSummaries,
-    List<RefreshItemResponse> errors
+    List<RefreshItemResponse> items
 ) {
-    public static RefreshResponse from(RefreshRun run, List<RefreshJobSummary> jobSummaries, List<RefreshRunItem> errors) {
-        return new RefreshResponse(
+    public static RefreshDetailResponse from(RefreshRun run, List<RefreshJobSummary> jobSummaries,
+                                             List<RefreshRunItem> items) {
+        return new RefreshDetailResponse(
             run.getId(),
             run.getStatus().name(),
+            run.getJobName(),
             run.getStartedAt(),
             run.getFinishedAt(),
             run.getSymbolsRequested(),
             run.getSymbolsSucceeded(),
             run.getSymbolsFailed(),
             jobSummaries,
-            errors.stream().map(RefreshItemResponse::from).toList()
-        );
-    }
-
-    public static RefreshResponse from(RefreshRun run) {
-        return new RefreshResponse(
-            run.getId(),
-            run.getStatus().name(),
-            run.getStartedAt(),
-            run.getFinishedAt(),
-            run.getSymbolsRequested(),
-            run.getSymbolsSucceeded(),
-            run.getSymbolsFailed(),
-            List.of(),
-            List.of()
+            items.stream().map(RefreshItemResponse::from).toList()
         );
     }
 }

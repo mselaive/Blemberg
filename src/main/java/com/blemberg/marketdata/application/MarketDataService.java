@@ -6,7 +6,6 @@ import com.blemberg.marketdata.domain.DividendYield;
 import com.blemberg.marketdata.domain.HistoricalVolatilityCalculator;
 import com.blemberg.marketdata.domain.MarketDailyBar;
 import com.blemberg.marketdata.domain.MarketPriceSnapshot;
-import com.blemberg.marketdata.domain.RateMethod;
 import com.blemberg.marketdata.domain.RiskFreeRate;
 import com.blemberg.marketdata.domain.RiskFreeRateSelection;
 import com.blemberg.marketdata.domain.RiskFreeRateSelector;
@@ -58,18 +57,53 @@ public class MarketDataService {
     }
 
     @Transactional(readOnly = true)
-    public List<SnapshotResponse> snapshots(String symbolsCsv) {
+    public SnapshotsResponse snapshots(String symbolsCsv) {
         List<String> symbols = Symbols.normalizeCsv(symbolsCsv);
         Map<String, SnapshotResponse> latestBySymbol = new LinkedHashMap<>();
+        List<String> missingSymbols = new java.util.ArrayList<>();
         for (String symbol : symbols) {
-            MarketPriceSnapshot snapshot = snapshotRepository.findTopBySymbolOrderByAsOfDesc(symbol)
-                .orElseThrow(() -> new NotFoundException("Snapshot not found"));
-            latestBySymbol.put(symbol, SnapshotResponse.from(snapshot, isStale(snapshot.getAsOf(), properties.snapshotStaleAfter())));
+            snapshotRepository.findTopBySymbolOrderByAsOfDesc(symbol)
+                .ifPresentOrElse(
+                    snapshot -> latestBySymbol.put(symbol, SnapshotResponse.from(
+                        snapshot,
+                        isStale(snapshot.getAsOf(), properties.snapshotStaleAfter())
+                    )),
+                    () -> missingSymbols.add(symbol)
+                );
         }
-        return latestBySymbol.values().stream().toList();
+        if (latestBySymbol.isEmpty()) {
+            throw new NotFoundException("Snapshot not found");
+        }
+        return new SnapshotsResponse(latestBySymbol.values().stream().toList(), missingSymbols);
     }
 
     @Transactional(readOnly = true)
+    public List<DailyBarResponse> dailyBars(String symbol, int limit) {
+        String normalized = Symbols.normalize(symbol);
+        if (limit < 1 || limit > 500) {
+            throw new IllegalArgumentException("Limit must be between 1 and 500");
+        }
+        instrumentService.findRequired(normalized);
+        List<MarketDailyBar> bars = barRepository.findBySymbolOrderByBarDateDesc(
+            normalized,
+            PageRequest.of(0, limit)
+        );
+        if (bars.isEmpty()) {
+            throw new NotFoundException("Daily bars not found");
+        }
+        return bars.stream()
+            .map(DailyBarResponse::from)
+            .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<RiskFreeRateResponse> riskFreeRates() {
+        return latestRiskFreeRatesOrEmpty().stream()
+            .map(RiskFreeRateResponse::from)
+            .toList();
+    }
+
+    @Transactional
     public PricingInputsResponse europeanOptionPricingInputs(String symbol, LocalDate maturityDate) {
         String normalized = Symbols.normalize(symbol);
         if (maturityDate == null || !maturityDate.isAfter(LocalDate.now(ZoneOffset.UTC))) {
@@ -106,8 +140,8 @@ public class MarketDataService {
         );
 
         DividendYield dividendYield = dividendYieldRepository.findTopBySymbolOrderByAsOfDesc(normalized)
-            .orElseGet(() -> new DividendYield(normalized, BigDecimal.ZERO,
-                com.blemberg.marketdata.domain.DividendYieldMethod.UNKNOWN_ZERO, Instant.now()));
+            .orElseGet(() -> dividendYieldRepository.save(new DividendYield(normalized, BigDecimal.ZERO,
+                com.blemberg.marketdata.domain.DividendYieldMethod.UNKNOWN_ZERO, Instant.now())));
         if (dividendYield.getDividendYield().signum() < 0) {
             throw new NotFoundException("Pricing inputs not found");
         }
@@ -138,12 +172,17 @@ public class MarketDataService {
     }
 
     private List<RiskFreeRate> latestRiskFreeRates() {
+        List<RiskFreeRate> rates = latestRiskFreeRatesOrEmpty();
+        if (rates.isEmpty()) {
+            throw new NotFoundException("Pricing inputs not found");
+        }
+        return rates;
+    }
+
+    private List<RiskFreeRate> latestRiskFreeRatesOrEmpty() {
         Map<Integer, RiskFreeRate> latestByTenor = new LinkedHashMap<>();
         for (RiskFreeRate rate : riskFreeRateRepository.findAllByOrderByTenorMonthsAscAsOfDesc()) {
             latestByTenor.putIfAbsent(rate.getTenorMonths(), rate);
-        }
-        if (latestByTenor.isEmpty()) {
-            throw new NotFoundException("Pricing inputs not found");
         }
         return latestByTenor.values().stream().toList();
     }

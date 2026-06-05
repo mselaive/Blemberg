@@ -55,7 +55,24 @@ After the app is up, run:
 curl -X POST http://localhost:8081/api/admin/market-data/refresh
 ```
 
-Before this refresh, instruments exist but snapshots, historical bars, and rates may not exist yet.
+Before this refresh, instruments exist but snapshots, historical bars, and rates may not exist yet. The manual refresh prioritizes AAPL, AMZN, MSFT, and SPY so NexusXVA can validate pricing integration quickly even with the Twelve Data free tier.
+
+Inspect the latest refresh:
+
+```bash
+curl http://localhost:8081/api/admin/market-data/refresh-runs
+curl http://localhost:8081/api/admin/market-data/refresh/latest
+```
+
+Smoke-test cached market data:
+
+```bash
+curl "http://localhost:8081/api/market-data/snapshots?symbols=AAPL,SPY,QQQ,MSFT"
+curl "http://localhost:8081/api/market-data/daily-bars?symbol=AAPL&limit=5"
+curl http://localhost:8081/api/market-data/risk-free-rates
+curl "http://localhost:8081/api/market-data/pricing-inputs/european-option?symbol=AAPL&maturityDate=2027-06-01"
+curl "http://localhost:8081/api/market-data/pricing-inputs/european-option?symbol=AMZN&maturityDate=2027-06-01"
+```
 
 ## Stop
 

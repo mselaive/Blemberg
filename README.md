@@ -100,6 +100,13 @@ Manual refresh:
 POST /api/admin/market-data/refresh
 ```
 
+Refresh detail:
+
+```http
+GET /api/admin/market-data/refresh/{runId}
+GET /api/admin/market-data/refresh/latest
+```
+
 ## NexusXVA Contract
 
 Pricing inputs include:

@@ -8,4 +8,6 @@ import java.util.Optional;
 public interface DividendYieldRepository extends JpaRepository<DividendYield, Long> {
 
     Optional<DividendYield> findTopBySymbolOrderByAsOfDesc(String symbol);
+
+    boolean existsBySymbol(String symbol);
 }

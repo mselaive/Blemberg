@@ -41,6 +41,7 @@ Main tables:
 - `risk_free_rates`: FRED Treasury rates stored as decimals.
 - `dividend_yields`: dividend yield assumptions.
 - `refresh_runs`: refresh status and failures.
+- `refresh_run_items`: per-job diagnostics for provider, symbol, tenor, status, and sanitized error messages.
 
 ## Pricing Inputs
 
@@ -69,3 +70,21 @@ Schedulers also refresh:
 - FRED rates daily.
 
 If a provider fails, Blemberg keeps the latest usable cached value and records the failure in `refresh_runs`.
+
+Refresh diagnostics are stored in `refresh_run_items`. Use:
+
+```http
+GET /api/admin/market-data/refresh-runs
+GET /api/admin/market-data/refresh/{runId}
+GET /api/admin/market-data/refresh/latest
+```
+
+The manual refresh is optimized for development with the Twelve Data free tier. It refreshes FRED tenors tolerantly, ensures dividend defaults, then processes priority symbols as `quote + daily bars`: AAPL, AMZN, MSFT, and SPY before the rest of the watchlist. If Twelve Data rate limits are reached, remaining work is marked as `SKIPPED_RATE_LIMIT` instead of becoming opaque provider failures.
+
+## Diagnostic Endpoints
+
+- `GET /api/market-data/snapshots?symbols=AAPL,MSFT`: returns available cached snapshots plus `missingSymbols`.
+- `GET /api/market-data/daily-bars?symbol=AAPL&limit=90`: returns cached bars or a clean `404`.
+- `GET /api/market-data/risk-free-rates`: returns cached FRED Treasury rates as decimals, or an empty list.
+- `GET /actuator/mappings`: exposed for local endpoint diagnostics.
+- `GET /v3/api-docs`: returns clean `501 Not Implemented`; OpenAPI is intentionally not enabled in V1.

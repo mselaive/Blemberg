@@ -1,8 +1,10 @@
 package com.blemberg.marketdata.api;
 
+import com.blemberg.marketdata.application.DailyBarResponse;
 import com.blemberg.marketdata.application.MarketDataService;
 import com.blemberg.marketdata.application.PricingInputsResponse;
-import com.blemberg.marketdata.application.SnapshotResponse;
+import com.blemberg.marketdata.application.RiskFreeRateResponse;
+import com.blemberg.marketdata.application.SnapshotsResponse;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -23,8 +25,19 @@ public class MarketDataController {
     }
 
     @GetMapping("/snapshots")
-    public List<SnapshotResponse> snapshots(@RequestParam String symbols) {
+    public SnapshotsResponse snapshots(@RequestParam String symbols) {
         return marketDataService.snapshots(symbols);
+    }
+
+    @GetMapping("/daily-bars")
+    public List<DailyBarResponse> dailyBars(@RequestParam String symbol,
+                                            @RequestParam(defaultValue = "90") int limit) {
+        return marketDataService.dailyBars(symbol, limit);
+    }
+
+    @GetMapping("/risk-free-rates")
+    public List<RiskFreeRateResponse> riskFreeRates() {
+        return marketDataService.riskFreeRates();
     }
 
     @GetMapping("/pricing-inputs/european-option")

@@ -35,6 +35,16 @@ class RiskFreeRateSelectorTest {
         assertThat(selection.rate()).isEqualByComparingTo("0.0500");
     }
 
+    @Test
+    void fallsBackToNearestTenorWithIncompleteCurve() {
+        RiskFreeRateSelection selection = selector.select(18.0, List.of(
+            rate("1Y", 12, "0.0400")
+        ));
+
+        assertThat(selection.method()).isEqualTo(RateMethod.NEAREST_TENOR);
+        assertThat(selection.rate()).isEqualByComparingTo("0.0400");
+    }
+
     private RiskFreeRate rate(String code, int months, String value) {
         return new RiskFreeRate(code, months, "DGS" + code, new BigDecimal(value), LocalDate.now(), Instant.now());
     }

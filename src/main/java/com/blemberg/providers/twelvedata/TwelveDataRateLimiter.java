@@ -1,6 +1,5 @@
 package com.blemberg.providers.twelvedata;
 
-import com.blemberg.shared.error.ProviderUnavailableException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -44,7 +43,7 @@ public class TwelveDataRateLimiter {
 
         if (minuteCredits.size() + credits > properties.creditsPerMinute()
             || dayCredits + credits > properties.creditsPerDay()) {
-            throw new ProviderUnavailableException("Market data service unavailable");
+            throw new TwelveDataRateLimitException();
         }
 
         for (int i = 0; i < credits; i++) {
